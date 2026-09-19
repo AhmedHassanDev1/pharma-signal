@@ -1,0 +1,28 @@
+{
+  "name": "@pharma-signal/frontend",
+  "version": "0.1.0",
+  "description": "Pharma Signal Platform Frontend Dashboard (Next.js)",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/lib/api-client.test.mjs"
+  },
+  "dependencies": {
+    "@pharma-signal/config": "*",
+    "@pharma-signal/contracts": "*",
+    "@pharma-signal/validation": "*",
+    "lucide-react": "^0.378.0",
+    "next": "^14.2.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.4.5"
+  }
+}

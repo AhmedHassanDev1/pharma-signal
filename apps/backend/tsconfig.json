@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/validation" },
+    { "path": "../../packages/config" }
+  ],
+  "include": ["src/**/*"]
+}
