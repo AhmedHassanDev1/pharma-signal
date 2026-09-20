@@ -33,6 +33,9 @@ export * from './dto/register-data-source.dto.js';
 export * from './dto/schema-snapshot.dto.js';
 export * from './dto/profile-snapshot.dto.js';
 export * from './dto/canonical-sync.dto.js';
+export * from './dto/platform-overview.dto.js';
+export * from './dto/device-list.dto.js';
+export * from './dto/data-source-list.dto.js';
 
 // Errors
 export * from './errors/problem-details.interface.js';

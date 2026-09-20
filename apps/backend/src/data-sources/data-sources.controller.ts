@@ -3,7 +3,6 @@ import {
   Post,
   Body,
   UseGuards,
-  UsePipes,
   HttpCode,
   HttpStatus
 } from '@nestjs/common';

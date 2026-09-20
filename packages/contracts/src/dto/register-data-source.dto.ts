@@ -5,8 +5,13 @@ export interface RegisterDataSourceRequestDto {
   engine: string;
   databaseName: string;
   branchId?: string;
-  declaredSoftwareName?: string;
-  detectedSoftwareName?: string;
+  branch_id?: string;
+  organizationId?: string;
+  organization_id?: string;
+  deviceId?: string;
+  device_id?: string;
+  declaredSoftwareName?: string | null;
+  detectedSoftwareName?: string | null;
 }
 
 export interface RegisterDataSourceResponseDto {

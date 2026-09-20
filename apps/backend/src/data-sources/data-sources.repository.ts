@@ -38,10 +38,12 @@ export class DataSourcesRepository {
     deviceId: string,
     localDataSourceKey: string
   ): Promise<DataSource | null> {
-    return this.prisma.dataSource.findFirst({
+    return this.prisma.dataSource.findUnique({
       where: {
-        deviceId,
-        localDataSourceKey
+        deviceId_localDataSourceKey: {
+          deviceId,
+          localDataSourceKey
+        }
       }
     });
   }
@@ -85,6 +87,37 @@ export class DataSourcesRepository {
   async findByDevice(deviceId: string): Promise<DataSource[]> {
     return this.prisma.dataSource.findMany({
       where: { deviceId }
+    });
+  }
+
+  async findAllWithRelations(limit = 100) {
+    return this.prisma.dataSource.findMany({
+      include: {
+        organization: true,
+        branch: true,
+        device: true,
+        schemaSnapshots: {
+          orderBy: { version: 'desc' },
+          take: 1
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    });
+  }
+
+  async findByIdWithRelations(id: string) {
+    return this.prisma.dataSource.findUnique({
+      where: { id },
+      include: {
+        organization: true,
+        branch: true,
+        device: true,
+        schemaSnapshots: {
+          orderBy: { version: 'desc' },
+          take: 1
+        }
+      }
     });
   }
 }

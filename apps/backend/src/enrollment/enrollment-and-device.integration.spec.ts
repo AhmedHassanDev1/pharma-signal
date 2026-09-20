@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, Controller, Get, UseGuards } from '@nestjs/common';
 import { AppModule } from '../app.module.js';
@@ -83,12 +84,12 @@ describe('AHM-293: Enrollment & Device Integration Tests', () => {
       data: {
         organizationId: org1.id,
         name: 'Inpatient Pharmacy Alpha',
-        code: 'AMC-INP-1',
+        code: `AMC-INP-${randomUUID().slice(0, 8)}`,
         status: BranchStatus.ACTIVE
       }
     });
 
-    const agentInstanceId1 = '11111111-2222-3333-4444-555555555555';
+    const agentInstanceId1 = randomUUID();
 
     // =========================================================================
     // 2. Token Creation & Device Enrollment (POST /api/v1/agent/enroll)
@@ -262,13 +263,13 @@ describe('AHM-293: Enrollment & Device Integration Tests', () => {
       data: {
         organizationId: org2.id,
         name: 'Beta Branch 1',
-        code: 'BET-01',
+        code: `BET-${randomUUID().slice(0, 8)}`,
         status: BranchStatus.ACTIVE
       }
     });
 
     // Create a new active device in Org 2
-    const agentInstanceId2 = '22222222-3333-4444-5555-666666666666';
+    const agentInstanceId2 = randomUUID();
     const tokenOrg2 = await enrollmentTokenService.createToken({
       organizationId: org2.id,
       branchId: branch2.id,

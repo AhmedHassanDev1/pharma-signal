@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../app.module.js';
@@ -61,7 +62,7 @@ describe('Enrollment Endpoint E2E (POST /api/v1/agent/enroll)', () => {
       data: {
         organizationId: org.id,
         name: 'E2E Branch 1',
-        code: 'E2E-BR-1',
+        code: `E2E-BR-${randomUUID().slice(0, 8)}`,
         status: BranchStatus.ACTIVE
       }
     });
@@ -73,7 +74,7 @@ describe('Enrollment Endpoint E2E (POST /api/v1/agent/enroll)', () => {
       expiresInSeconds: 3600
     });
 
-    const agentInstanceId = '77777777-8888-9999-aaaa-bbbbbbbbbbbb';
+    const agentInstanceId = randomUUID();
 
     const payload: EnrollDeviceRequestDto = {
       enrollmentToken: rawToken,
@@ -133,7 +134,7 @@ describe('Enrollment Endpoint E2E (POST /api/v1/agent/enroll)', () => {
   it('should return 400 Bad Request when enrollment token is invalid or non-existent', async () => {
     const payload: EnrollDeviceRequestDto = {
       enrollmentToken: 'ps_et_nonexistent_token',
-      agentInstanceId: '88888888-9999-aaaa-bbbb-cccccccccccc',
+      agentInstanceId: randomUUID(),
       hostname: 'E2E-TERMINAL-02',
       os: 'Windows 11 Enterprise',
       appVersion: '0.1.0'

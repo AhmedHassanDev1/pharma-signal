@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from './prisma.service.js';
 import { DatabaseModule } from './database.module.js';
@@ -52,14 +53,14 @@ describe('Database Integration & Constraint Tests', () => {
       data: {
         organizationId: org.id,
         name: 'Test Branch Alpha',
-        code: 'INT-ALPHA',
+        code: `INT-ALPHA-${randomUUID().slice(0, 8)}`,
         status: BranchStatus.ACTIVE
       }
     });
     expect(branch.organizationId).toBe(org.id);
 
     // 3. Create Device linked to Organization and Branch
-    const agentInstanceId = '11111111-2222-3333-4444-555555555555';
+    const agentInstanceId = randomUUID();
     const device = await prisma.device.create({
       data: {
         organizationId: org.id,
@@ -126,7 +127,7 @@ describe('Database Integration & Constraint Tests', () => {
       }
     });
 
-    const duplicateAgentId = '22222222-3333-4444-5555-666666666666';
+    const duplicateAgentId = randomUUID();
 
     // First device creation should succeed
     await prisma.device.create({

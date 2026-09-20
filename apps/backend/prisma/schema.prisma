@@ -58,6 +58,11 @@ model Organization {
   devices          Device[]
   dataSources      DataSource[]
   enrollmentTokens EnrollmentToken[]
+  ingestionBatches IngestionBatch[]
+  canonicalProducts CanonicalProduct[]
+  canonicalBatches CanonicalBatch[]
+  canonicalInventories CanonicalInventory[]
+  canonicalSuppliers CanonicalSupplier[]
 
   @@map("organizations")
 }
@@ -117,6 +122,7 @@ model Device {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
   dataSources  DataSource[]
+  ingestionBatches IngestionBatch[]
 
   @@index([organizationId])
   @@index([branchId])
@@ -142,10 +148,216 @@ model DataSource {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
   device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  schemaSnapshots  SchemaSnapshot[]
+  profileSnapshots ProfileSnapshot[]
+  ingestionBatches IngestionBatch[]
+  canonicalProducts CanonicalProduct[]
+  canonicalBatches CanonicalBatch[]
+  canonicalInventories CanonicalInventory[]
+  canonicalSuppliers CanonicalSupplier[]
 
+  @@unique([deviceId, localDataSourceKey])
   @@index([organizationId])
   @@index([branchId])
   @@index([deviceId])
   @@index([localDataSourceKey])
   @@map("data_sources")
 }
+
+enum DatabaseClassification {
+  ORACLE
+  SQLSERVER
+  POSTGRESQL
+  MYSQL
+  SQLITE
+  UNKNOWN
+}
+
+model SchemaSnapshot {
+  id                String      @id @default(uuid()) @db.Uuid
+  dataSourceId      String      @map("data_source_id") @db.Uuid
+  schemaFingerprint String      @map("schema_fingerprint") @db.VarChar(64)
+  tables            Json        @db.JsonB
+  version           Int         @default(1)
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  dataSource DataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+
+  @@unique([dataSourceId, schemaFingerprint])
+  @@unique([dataSourceId, version])
+  @@index([dataSourceId])
+  @@index([schemaFingerprint])
+  @@map("schema_snapshots")
+}
+
+model ProfileSnapshot {
+  id                String                 @id @default(uuid()) @db.Uuid
+  dataSourceId      String                 @map("data_source_id") @db.Uuid
+  schemaFingerprint String                 @map("schema_fingerprint") @db.VarChar(64)
+  classification    DatabaseClassification @default(UNKNOWN)
+  confidence        Float                  @db.DoublePrecision
+  evidence          Json                   @default("{}") @db.JsonB
+  reason            String                 @db.Text
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  dataSource DataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+
+  @@index([dataSourceId])
+  @@index([schemaFingerprint])
+  @@map("profile_snapshots")
+}
+
+enum SyncBatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  PARTIALLY_FAILED
+}
+
+model IngestionBatch {
+  id             String          @id @default(uuid()) @db.Uuid
+  syncBatchId    String          @map("sync_batch_id") @db.VarChar(255)
+  dataSourceId   String          @map("data_source_id") @db.Uuid
+  deviceId       String          @map("device_id") @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  status         SyncBatchStatus @default(PENDING)
+  receivedCounts Json            @default("{}") @map("received_counts") @db.JsonB
+  appliedCounts  Json            @default("{}") @map("applied_counts") @db.JsonB
+  rejectedCounts Int             @default(0) @map("rejected_counts")
+  summary        Json?           @db.JsonB
+  errorMessage   String?         @map("error_message") @db.Text
+  processedAt    DateTime?       @map("processed_at") @db.Timestamptz(6)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  dataSource DataSource   @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  device     Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  tenant     Organization @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([dataSourceId, syncBatchId])
+  @@index([syncBatchId])
+  @@index([dataSourceId])
+  @@index([deviceId])
+  @@index([tenantId])
+  @@index([status])
+  @@map("ingestion_batches")
+}
+
+model CanonicalProduct {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  dataSourceId String   @map("data_source_id") @db.Uuid
+  sourceTable  String   @map("source_table") @db.VarChar(255)
+  sourceId     String   @map("source_id") @db.VarChar(255)
+  code         String   @db.VarChar(255)
+  name         String   @db.VarChar(255)
+  description  String?  @db.Text
+  category     String?  @db.VarChar(255)
+  unit         String?  @db.VarChar(50)
+  isActive     Boolean  @default(true) @map("is_active")
+  rawPayload   Json?    @map("raw_payload") @db.JsonB
+  provenance   Json     @db.JsonB
+  extractedAt  DateTime @map("extracted_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Organization         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource  DataSource           @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  batches     CanonicalBatch[]
+  inventories CanonicalInventory[]
+
+  @@unique([tenantId, dataSourceId, sourceTable, sourceId])
+  @@index([tenantId])
+  @@index([dataSourceId])
+  @@index([code])
+  @@map("canonical_products")
+}
+
+model CanonicalBatch {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  dataSourceId      String    @map("data_source_id") @db.Uuid
+  sourceTable       String    @map("source_table") @db.VarChar(255)
+  sourceId          String    @map("source_id") @db.VarChar(255)
+  productSourceId   String    @map("product_source_id") @db.VarChar(255)
+  productId         String?   @map("product_id") @db.Uuid
+  batchNumber       String    @map("batch_number") @db.VarChar(255)
+  expiryDate        String?   @map("expiry_date") @db.VarChar(50)
+  manufacturingDate String?   @map("manufacturing_date") @db.VarChar(50)
+  rawPayload        Json?     @map("raw_payload") @db.JsonB
+  provenance        Json      @db.JsonB
+  extractedAt       DateTime  @map("extracted_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Organization         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource  DataSource           @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  product     CanonicalProduct?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+  inventories CanonicalInventory[]
+
+  @@unique([tenantId, dataSourceId, sourceTable, sourceId])
+  @@index([tenantId])
+  @@index([dataSourceId])
+  @@index([batchNumber])
+  @@map("canonical_batches")
+}
+
+model CanonicalInventory {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  dataSourceId    String    @map("data_source_id") @db.Uuid
+  sourceTable     String    @map("source_table") @db.VarChar(255)
+  sourceId        String    @map("source_id") @db.VarChar(255)
+  productSourceId String    @map("product_source_id") @db.VarChar(255)
+  productId       String?   @map("product_id") @db.Uuid
+  batchSourceId   String?   @map("batch_source_id") @db.VarChar(255)
+  batchId         String?   @map("batch_id") @db.Uuid
+  quantity        Float     @db.DoublePrecision
+  unitPrice       Float?    @map("unit_price") @db.DoublePrecision
+  location        String?   @db.VarChar(255)
+  rawPayload      Json?     @map("raw_payload") @db.JsonB
+  provenance      Json      @db.JsonB
+  extractedAt     DateTime  @map("extracted_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant     Organization      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource DataSource        @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  product    CanonicalProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  batch      CanonicalBatch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, dataSourceId, sourceTable, sourceId])
+  @@index([tenantId])
+  @@index([dataSourceId])
+  @@map("canonical_inventories")
+}
+
+model CanonicalSupplier {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  dataSourceId String   @map("data_source_id") @db.Uuid
+  sourceTable  String   @map("source_table") @db.VarChar(255)
+  sourceId     String   @map("source_id") @db.VarChar(255)
+  name         String   @db.VarChar(255)
+  contact      String?  @db.VarChar(255)
+  phone        String?  @db.VarChar(50)
+  email        String?  @db.VarChar(255)
+  address      String?  @db.Text
+  isActive     Boolean  @default(true) @map("is_active")
+  rawPayload   Json?    @map("raw_payload") @db.JsonB
+  provenance   Json     @db.JsonB
+  extractedAt  DateTime @map("extracted_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant     Organization @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource DataSource   @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dataSourceId, sourceTable, sourceId])
+  @@index([tenantId])
+  @@index([dataSourceId])
+  @@map("canonical_suppliers")
+}
+
+

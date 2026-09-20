@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, Controller, Get, UseGuards } from '@nestjs/common';
 import { AppModule } from '../app.module.js';
@@ -41,12 +42,12 @@ describe('Device Authentication & Authorization Integration Tests', () => {
   let baseUrl: string;
 
   beforeAll(async () => {
-    const moduleRef: TestingModule = await Test.createTestingModule({
+    const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule, AuthModule, EnrollmentModule],
       controllers: [TestProtectedController]
     }).compile();
 
-    app = moduleRef.createNestApplication();
+    app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
 
     prisma = app.get<PrismaService>(PrismaService);
@@ -82,12 +83,12 @@ describe('Device Authentication & Authorization Integration Tests', () => {
       data: {
         organizationId: org.id,
         name: 'Protected Branch 1',
-        code: 'PROT-01',
+        code: `PROT-${randomUUID().slice(0, 8)}`,
         status: BranchStatus.ACTIVE
       }
     });
 
-    const agentInstanceId = '99999999-aaaa-bbbb-cccc-dddddddddddd';
+    const agentInstanceId = randomUUID();
 
     // 2. Create Device
     const device = await devicesService.registerDevice({

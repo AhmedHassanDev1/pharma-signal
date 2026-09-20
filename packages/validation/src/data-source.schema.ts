@@ -8,6 +8,11 @@ export const registerDataSourceSchema = z.object({
   engine: z.string().min(1, 'engine is required'),
   databaseName: z.string().min(1, 'databaseName is required'),
   branchId: z.string().uuid().optional(),
+  branch_id: z.string().uuid().optional(),
+  organizationId: z.string().uuid().optional(),
+  organization_id: z.string().uuid().optional(),
+  deviceId: z.string().uuid().optional(),
+  device_id: z.string().uuid().optional(),
   declaredSoftwareName: z.string().nullable().optional(),
   detectedSoftwareName: z.string().nullable().optional()
 });

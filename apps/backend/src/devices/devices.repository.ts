@@ -95,4 +95,16 @@ export class DevicesRepository {
       where: { organizationId }
     });
   }
+
+  async findAllWithRelations(limit = 100) {
+    return this.prisma.device.findMany({
+      include: {
+        organization: true,
+        branch: true,
+        _count: { select: { dataSources: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    });
+  }
 }

@@ -196,6 +196,49 @@ describe('DataSourcesService', () => {
       );
     });
 
+    it('should reject registration when client-supplied branch_id does not match authenticated device branchId', async () => {
+      const spoofedDto = {
+        ...validDto,
+        branch_id: 'different-branch-id'
+      } as unknown as RegisterDataSourceRequestDto;
+
+      await expect(service.registerDataSource(mockDevice, spoofedDto)).rejects.toThrow(
+        BadRequestException
+      );
+    });
+
+    it('should reject registration when client-supplied organizationId/organization_id does not match authenticated device organizationId', async () => {
+      await expect(
+        service.registerDataSource(mockDevice, {
+          ...validDto,
+          organizationId: 'different-org-id'
+        } as unknown as RegisterDataSourceRequestDto)
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.registerDataSource(mockDevice, {
+          ...validDto,
+          organization_id: 'different-org-id'
+        } as unknown as RegisterDataSourceRequestDto)
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject registration when client-supplied deviceId/device_id does not match authenticated device id', async () => {
+      await expect(
+        service.registerDataSource(mockDevice, {
+          ...validDto,
+          deviceId: 'different-device-id'
+        } as unknown as RegisterDataSourceRequestDto)
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.registerDataSource(mockDevice, {
+          ...validDto,
+          device_id: 'different-device-id'
+        } as unknown as RegisterDataSourceRequestDto)
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should accept registration when client-supplied branchId matches authenticated device branchId', async () => {
       const matchingDto: RegisterDataSourceRequestDto = {
         ...validDto,

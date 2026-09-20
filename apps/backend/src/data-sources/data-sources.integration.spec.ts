@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../app.module.js';
@@ -58,12 +59,12 @@ describe('Data Sources Integration & Registration API (POST /api/v1/agent/data-s
       data: {
         organizationId: org.id,
         name: 'Data Source Test Branch',
-        code: 'DS-TEST-BR-1',
+        code: `DS-TEST-${randomUUID().slice(0, 8)}`,
         status: BranchStatus.ACTIVE
       }
     });
 
-    const agentInstanceId = 'da1a0000-1111-2222-3333-444444444444';
+    const agentInstanceId = randomUUID();
     const device = await prisma.device.create({
       data: {
         organizationId: org.id,
@@ -116,10 +117,6 @@ describe('Data Sources Integration & Registration API (POST /api/v1/agent/data-s
       body: JSON.stringify(payload)
     });
 
-    if (response.status !== 201) {
-      console.error('Registration failed:', await response.text());
-    }
-
     expect(response.status).toBe(201);
     const body = (await response.json()) as any;
 
@@ -144,7 +141,7 @@ describe('Data Sources Integration & Registration API (POST /api/v1/agent/data-s
     expect(dbRecord?.deviceId).toBe(device.id);
     expect(dbRecord?.detectionStatus).toBe(DetectionStatus.MATCH);
 
-    // 6. Test idempotency: re-register with updated databaseName
+    // 6. Test idempotency: same device + same local key -> same DataSource
     const updatePayload: RegisterDataSourceRequestDto = {
       localDataSourceKey: 'sqlite-pos-db',
       engine: 'SQLite',
@@ -164,7 +161,7 @@ describe('Data Sources Integration & Registration API (POST /api/v1/agent/data-s
 
     expect(updateResponse.status).toBe(201);
     const updateBody = (await updateResponse.json()) as any;
-    expect(updateBody.dataSourceId).toBe(body.dataSourceId); // Same dataSourceId
+    expect(updateBody.dataSourceId).toBe(body.dataSourceId); // Must be the same DataSource
     expect(updateBody.detectionStatus).toBe('CONFLICT');
 
     const updatedDbRecord = await prisma.dataSource.findUnique({
@@ -173,21 +170,81 @@ describe('Data Sources Integration & Registration API (POST /api/v1/agent/data-s
     expect(updatedDbRecord?.databaseName).toBe('pharmacy_v2.db');
     expect(updatedDbRecord?.detectionStatus).toBe(DetectionStatus.CONFLICT);
 
-    // 7. Test spoofed branchId (client passes a branchId different from authenticated device branch)
-    const spoofedResponse = await fetch(`${baseUrl}/agent/data-sources`, {
+    // 7. Test: different device + same local key -> different DataSource
+    const device2 = await prisma.device.create({
+      data: {
+        organizationId: org.id,
+        branchId: branch.id,
+        agentInstanceId: randomUUID(),
+        hostname: 'DS-TEST-PC-2',
+        os: 'Windows 11',
+        appVersion: '0.1.0',
+        status: DeviceStatus.ACTIVE
+      }
+    });
+    const device2Token = deviceCredentialService.generateDeviceToken({
+      sub: device2.id,
+      deviceId: device2.id,
+      organizationId: org.id,
+      branchId: branch.id,
+      agentInstanceId: device2.agentInstanceId
+    });
+
+    const responseDevice2 = await fetch(`${baseUrl}/agent/data-sources`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${device2Token}`
+      },
+      body: JSON.stringify({
+        localDataSourceKey: 'sqlite-pos-db', // Same localDataSourceKey!
+        engine: 'SQLite',
+        databaseName: 'pharmacy_device2.db'
+      })
+    });
+
+    expect(responseDevice2.status).toBe(201);
+    const bodyDevice2 = (await responseDevice2.json()) as any;
+    expect(bodyDevice2.dataSourceId).toBeDefined();
+    expect(bodyDevice2.dataSourceId).not.toBe(body.dataSourceId); // Must be different DataSource
+    expect(bodyDevice2.deviceId).toBe(device2.id);
+
+    // 8. Test Security: client cannot spoof { organization_id, branch_id, device_id } to change ownership
+    const spoofedResponse1 = await fetch(`${baseUrl}/agent/data-sources`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${deviceToken}`
       },
       body: JSON.stringify({
-        ...payload,
-        branchId: '00000000-0000-0000-0000-000000000000'
+        localDataSourceKey: 'sqlite-pos-db-3',
+        engine: 'SQLite',
+        databaseName: 'test.db',
+        organization_id: randomUUID(),
+        branch_id: randomUUID(),
+        device_id: randomUUID()
       })
     });
-    expect(spoofedResponse.status).toBe(400);
+    expect(spoofedResponse1.status).toBe(400);
 
-    // 8. Test validation error (missing required fields)
+    const spoofedResponse2 = await fetch(`${baseUrl}/agent/data-sources`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${deviceToken}`
+      },
+      body: JSON.stringify({
+        localDataSourceKey: 'sqlite-pos-db-4',
+        engine: 'SQLite',
+        databaseName: 'test.db',
+        organizationId: randomUUID(),
+        branchId: randomUUID(),
+        deviceId: randomUUID()
+      })
+    });
+    expect(spoofedResponse2.status).toBe(400);
+
+    // 9. Test validation error (missing required fields)
     const invalidResponse = await fetch(`${baseUrl}/agent/data-sources`, {
       method: 'POST',
       headers: {

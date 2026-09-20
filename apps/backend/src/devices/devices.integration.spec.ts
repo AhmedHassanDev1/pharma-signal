@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../database/prisma.service.js';
 import { DatabaseModule } from '../database/database.module.js';
@@ -52,12 +53,12 @@ describe('Devices & Organizations Domain Integration Tests', () => {
       data: {
         organizationId: org.id,
         name: 'Dev Branch Alpha',
-        code: 'DEV-INT-ALPHA',
+        code: `DEV-INT-ALPHA-${randomUUID().slice(0, 8)}`,
         status: BranchStatus.ACTIVE
       }
     });
 
-    const agentInstanceId = '33333333-4444-5555-6666-777777777777';
+    const agentInstanceId = randomUUID();
 
     // 3. Register Device through DevicesService (server-side ownership check)
     const device = await devicesService.registerDevice({
@@ -160,7 +161,7 @@ describe('Devices & Organizations Domain Integration Tests', () => {
       devicesService.registerDevice({
         organizationId: org2.id,
         branchId: branch1.id,
-        agentInstanceId: '44444444-5555-6666-7777-888888888888',
+        agentInstanceId: randomUUID(),
         hostname: 'SPOOFED-POS',
         os: 'Windows 11',
         appVersion: '0.1.0'

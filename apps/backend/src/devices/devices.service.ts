@@ -5,8 +5,9 @@ import {
   ConflictException
 } from '@nestjs/common';
 import { Device, DeviceStatus, OrganizationStatus, BranchStatus } from '@prisma/client';
-import { DevicesRepository, DeviceWithRelations } from './devices.repository.js';
+import { DeviceWithRelations, DevicesRepository } from './devices.repository.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
+import { DeviceListItemDto } from '@pharma-signal/contracts';
 
 export interface RegisterDeviceParams {
   organizationId: string;
@@ -154,5 +155,24 @@ export class DevicesService {
     }
 
     return device;
+  }
+
+  async listDevices(limit = 100): Promise<DeviceListItemDto[]> {
+    const devices = await this.devicesRepository.findAllWithRelations(limit);
+    return devices.map((d) => ({
+      id: d.id,
+      organizationId: d.organizationId,
+      organizationName: d.organization.name,
+      branchId: d.branchId,
+      branchName: d.branch.name,
+      agentInstanceId: d.agentInstanceId,
+      hostname: d.hostname,
+      os: d.os,
+      appVersion: d.appVersion,
+      status: d.status,
+      lastSeenAt: d.lastSeenAt ? d.lastSeenAt.toISOString() : null,
+      createdAt: d.createdAt.toISOString(),
+      dataSourcesCount: d._count.dataSources
+    }));
   }
 }

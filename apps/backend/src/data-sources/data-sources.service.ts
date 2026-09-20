@@ -2,7 +2,10 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import {
   RegisterDataSourceRequestDto,
   RegisterDataSourceResponseDto,
-  DetectionStatus as ContractDetectionStatus
+  DetectionStatus as ContractDetectionStatus,
+  DataSourceListItemDto,
+  DataSourceDetailsDto,
+  TableSchema
 } from '@pharma-signal/contracts';
 import { DetectionStatus, DataSource } from '@prisma/client';
 import { DataSourcesRepository } from './data-sources.repository.js';
@@ -26,9 +29,26 @@ export class DataSourcesService {
     device: DeviceWithRelations,
     dto: RegisterDataSourceRequestDto
   ): Promise<RegisterDataSourceResponseDto> {
-    if (dto.branchId && dto.branchId !== device.branchId) {
+    // Security: reject any client attempts to forge branch, organization, or device ownership
+    const rawDto = dto as unknown as Record<string, unknown>;
+    const requestedBranchId = (dto.branchId ?? rawDto.branch_id) as string | undefined;
+    if (requestedBranchId && requestedBranchId !== device.branchId) {
       throw new BadRequestException(
-        `Provided branchId '${dto.branchId}' does not match authenticated device branch '${device.branchId}'`
+        `Provided branchId '${requestedBranchId}' does not match authenticated device branch '${device.branchId}'`
+      );
+    }
+
+    const requestedOrgId = (rawDto.organizationId ?? rawDto.organization_id) as string | undefined;
+    if (requestedOrgId && requestedOrgId !== device.organizationId) {
+      throw new BadRequestException(
+        `Provided organizationId '${requestedOrgId}' does not match authenticated device organization '${device.organizationId}'`
+      );
+    }
+
+    const requestedDeviceId = (rawDto.deviceId ?? rawDto.device_id) as string | undefined;
+    if (requestedDeviceId && requestedDeviceId !== device.id) {
+      throw new BadRequestException(
+        `Provided deviceId '${requestedDeviceId}' does not match authenticated device '${device.id}'`
       );
     }
 
@@ -111,5 +131,73 @@ export class DataSourcesService {
       return DetectionStatus.DETECTED_ONLY;
     }
     return DetectionStatus.UNKNOWN;
+  }
+
+  async listDataSources(limit = 100): Promise<DataSourceListItemDto[]> {
+    const dataSources = await this.repository.findAllWithRelations(limit);
+    return dataSources.map((ds) => {
+      const latestSnapshot = ds.schemaSnapshots[0];
+      const tables = (latestSnapshot?.tables as any[]) ?? [];
+      return {
+        id: ds.id,
+        organizationId: ds.organizationId,
+        organizationName: ds.organization.name,
+        branchId: ds.branchId,
+        branchName: ds.branch.name,
+        deviceId: ds.deviceId,
+        deviceHostname: ds.device.hostname,
+        localDataSourceKey: ds.localDataSourceKey,
+        engine: ds.engine,
+        databaseName: ds.databaseName,
+        declaredSoftwareName: ds.declaredSoftwareName,
+        detectedSoftwareName: ds.detectedSoftwareName,
+        detectionStatus: ds.detectionStatus,
+        status: ds.status,
+        createdAt: ds.createdAt.toISOString(),
+        latestSchemaVersion: latestSnapshot?.version ?? null,
+        latestSchemaFingerprint: latestSnapshot?.schemaFingerprint ?? null,
+        tablesCount: tables.length
+      };
+    });
+  }
+
+  async getDataSourceDetails(id: string): Promise<DataSourceDetailsDto> {
+    const ds = await this.repository.findByIdWithRelations(id);
+    if (!ds) {
+      throw new NotFoundException(`Data source with ID '${id}' not found`);
+    }
+
+    const latestSnapshot = ds.schemaSnapshots[0];
+    const tables = (latestSnapshot?.tables as any[]) ?? [];
+
+    return {
+      id: ds.id,
+      organizationId: ds.organizationId,
+      organizationName: ds.organization.name,
+      branchId: ds.branchId,
+      branchName: ds.branch.name,
+      deviceId: ds.deviceId,
+      deviceHostname: ds.device.hostname,
+      localDataSourceKey: ds.localDataSourceKey,
+      engine: ds.engine,
+      databaseName: ds.databaseName,
+      declaredSoftwareName: ds.declaredSoftwareName,
+      detectedSoftwareName: ds.detectedSoftwareName,
+      detectionStatus: ds.detectionStatus,
+      status: ds.status,
+      createdAt: ds.createdAt.toISOString(),
+      latestSchemaVersion: latestSnapshot?.version ?? null,
+      latestSchemaFingerprint: latestSnapshot?.schemaFingerprint ?? null,
+      tablesCount: tables.length,
+      latestSchema: latestSnapshot
+        ? {
+            id: latestSnapshot.id,
+            version: latestSnapshot.version,
+            schemaFingerprint: latestSnapshot.schemaFingerprint,
+            tables: latestSnapshot.tables as unknown as TableSchema[],
+            createdAt: latestSnapshot.createdAt.toISOString()
+          }
+        : null
+    };
   }
 }
