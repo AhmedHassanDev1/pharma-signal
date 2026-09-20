@@ -1,0 +1,151 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum OrganizationRole {
+  RETAIL_PHARMACY
+  PHARMACEUTICAL_SUPPLIER
+  COSMETICS_SUPPLIER
+  HOSPITAL_PHARMACY
+  OTHER
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DeviceStatus {
+  ACTIVE
+  SUSPENDED
+  RETIRED
+}
+
+enum DetectionStatus {
+  MATCH
+  DECLARED_ONLY
+  DETECTED_ONLY
+  CONFLICT
+  UNKNOWN
+}
+
+enum EnrollmentTokenStatus {
+  ACTIVE
+  USED
+  REVOKED
+  EXPIRED
+}
+
+model Organization {
+  id        String             @id @default(uuid()) @db.Uuid
+  name      String             @db.VarChar(255)
+  role      OrganizationRole   @default(RETAIL_PHARMACY)
+  status    OrganizationStatus @default(ACTIVE)
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  branches         Branch[]
+  devices          Device[]
+  dataSources      DataSource[]
+  enrollmentTokens EnrollmentToken[]
+
+  @@map("organizations")
+}
+
+model Branch {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  name           String       @db.VarChar(255)
+  code           String?      @db.VarChar(50)
+  status         BranchStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  devices          Device[]
+  dataSources      DataSource[]
+  enrollmentTokens EnrollmentToken[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("branches")
+}
+
+model EnrollmentToken {
+  id             String                @id @default(uuid()) @db.Uuid
+  tokenHash      String                @unique @map("token_hash") @db.VarChar(255)
+  organizationId String                @map("organization_id") @db.Uuid
+  branchId       String                @map("branch_id") @db.Uuid
+  status         EnrollmentTokenStatus @default(ACTIVE)
+  expiresAt      DateTime              @map("expires_at") @db.Timestamptz(6)
+  usedAt         DateTime?             @map("used_at") @db.Timestamptz(6)
+  revokedAt      DateTime?             @map("revoked_at") @db.Timestamptz(6)
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([tokenHash])
+  @@map("enrollment_tokens")
+}
+
+model Device {
+  id              String       @id @default(uuid()) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  branchId        String       @map("branch_id") @db.Uuid
+  agentInstanceId String       @unique @map("agent_instance_id") @db.Uuid
+  hostname        String       @db.VarChar(255)
+  os              String       @db.VarChar(255)
+  appVersion      String       @map("app_version") @db.VarChar(50)
+  status          DeviceStatus @default(ACTIVE)
+  lastSeenAt      DateTime?    @map("last_seen_at") @db.Timestamptz(6)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  dataSources  DataSource[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([agentInstanceId])
+  @@map("devices")
+}
+
+model DataSource {
+  id                   String          @id @default(uuid()) @db.Uuid
+  organizationId       String          @map("organization_id") @db.Uuid
+  branchId             String          @map("branch_id") @db.Uuid
+  deviceId             String          @map("device_id") @db.Uuid
+  localDataSourceKey   String          @map("local_data_source_key") @db.VarChar(255)
+  engine               String          @db.VarChar(50)
+  databaseName         String          @map("database_name") @db.VarChar(255)
+  declaredSoftwareName String?         @map("declared_software_name") @db.VarChar(255)
+  detectedSoftwareName String?         @map("detected_software_name") @db.VarChar(255)
+  detectionStatus      DetectionStatus @default(UNKNOWN) @map("detection_status")
+  status               String          @default("ACTIVE") @db.VarChar(50)
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([deviceId])
+  @@index([localDataSourceKey])
+  @@map("data_sources")
+}

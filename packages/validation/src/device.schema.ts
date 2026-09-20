@@ -8,7 +8,8 @@ export const enrollDeviceSchema = z.object({
   agentInstanceId: z.string().min(1, 'agentInstanceId is required'),
   hostname: z.string().min(1, 'hostname is required'),
   os: z.string().min(1, 'os is required'),
-  appVersion: z.string().min(1, 'appVersion is required')
+  appVersion: z.string().min(1, 'appVersion is required'),
+  branchId: z.string().uuid().optional()
 });
 
 export type EnrollDeviceInput = z.infer<typeof enrollDeviceSchema>;

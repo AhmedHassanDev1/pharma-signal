@@ -9,8 +9,10 @@
     "start": "node dist/main.js",
     "start:dev": "node --watch dist/main.js",
     "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js",
-    "typecheck": "tsc --noEmit",
-    "clean": "rimraf dist"
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.8",
@@ -20,6 +22,7 @@
     "@pharma-signal/contracts": "*",
     "@pharma-signal/validation": "*",
     "@pharma-signal/config": "*",
+    "@prisma/client": "^5.14.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -27,6 +30,8 @@
     "@nestjs/testing": "^10.3.8",
     "@types/jest": "^29.5.12",
     "jest": "^29.7.0",
-    "ts-jest": "^29.1.2"
+    "prisma": "^5.14.0",
+    "ts-jest": "^29.1.2",
+    "tsx": "^4.10.5"
   }
 }

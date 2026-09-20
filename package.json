@@ -11,10 +11,19 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "clean": "npm run clean --workspaces --if-present"
+    "clean": "npm run clean --workspaces --if-present",
+    "db:up": "docker compose -f docker/docker-compose.yml up -d",
+    "db:down": "docker compose -f docker/docker-compose.yml down",
+    "db:reset": "docker compose -f docker/docker-compose.yml down -v && docker compose -f docker/docker-compose.yml up -d",
+    "db:migrate": "npm run prisma:migrate -w @pharma-signal/backend",
+    "db:seed": "npm run prisma:seed -w @pharma-signal/backend",
+    "dev:backend": "npm run start:dev -w @pharma-signal/backend",
+    "dev:frontend": "npm run dev -w @pharma-signal/frontend",
+    "verify:local": "tsx scripts/verify-local.ts"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "@types/node": "^20.12.7"
+    "@types/node": "^20.12.7",
+    "tsx": "^4.23.13",
+    "typescript": "^5.4.5"
   }
 }

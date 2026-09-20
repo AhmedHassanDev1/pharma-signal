@@ -1,3 +1,6 @@
+export * from './organization.schema.js';
+export * from './branch.schema.js';
+export * from './detection-status.schema.js';
 export * from './device.schema.js';
 export * from './data-source.schema.js';
 export * from './schema-snapshot.schema.js';

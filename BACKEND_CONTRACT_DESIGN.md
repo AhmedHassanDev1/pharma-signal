@@ -172,8 +172,9 @@ The Backend must organize the incoming data into clear conceptual boundaries:
 
 ```mermaid
 graph TD
-    Tenant[Tenant / Organization] --> Device[Device Entity]
-    Device --> DataSource[Data Source Entity]
+    Org[Organization / Root Tenant] --> Branch[Branch]
+    Branch --> Device[Device Entity]
+    Branch --> DataSource[Data Source Entity]
     
     subgraph Snapshots [Immutable Historical Snapshots]
         Device --> EnvSnap[Device Environment Snapshot]
@@ -193,9 +194,10 @@ graph TD
 ### 3.1 Boundary Definitions
 
 1. **Domain Entity** (Mutable, Stateful):
-   - `Tenant` / `Organization`: The legal entity (Pharmacy, Pharmacy Chain, Distributor).
-   - `Device`: The enrolled Desktop Agent installation.
-   - `DataSource`: An identified ERP database instance on a device (identified by an opaque `data_source_id`).
+   - `Organization`: The top-level legal entity / root tenant (Pharmacy, Pharmacy Chain, Distributor, Supplier).
+   - `Branch`: An official physical or operational branch of an Organization.
+   - `Device`: An enrolled Desktop Agent installation assigned to an Organization and Branch.
+   - `DataSource`: An identified ERP database instance on a branch (identified by an opaque `data_source_id`).
    - `CanonicalEntity` (`Product`, `InventoryItem`, `Supplier`, `Batch`): Current state of truth in the central catalog.
 2. **Snapshot** (Immutable, Versioned, Append-Only):
    - `SchemaSnapshot`: Exact structural definition at a point in time, identified by a cryptographic hash of tables + columns.
@@ -204,19 +206,21 @@ graph TD
 3. **DTO** (Wire Transfer Envelope):
    - Ingestion payloads transmitted over HTTPS.
 4. **Provenance Metadata** (Audit & Deduplication):
-   - Every canonical record carries origin coordinates (`tenant_id`, `device_id`, `data_source_id`, `source_table`, `source_id`, `extracted_at`).
+   - Every canonical record carries origin coordinates (`organization_id`, `branch_id`, `device_id`, `data_source_id`, `source_table`, `source_id`, `extracted_at`).
 
 ---
 
 ## 4. Device Identity & Registration Contract
 
-The Backend must treat each installed Desktop Agent as an identifiable client `Device`.
+The Backend must treat each installed Desktop Agent as an identifiable client `Device` bound to an `Organization` and `Branch`.
 
 ### 4.1 Device Conceptual Model
 ```text
 Device {
-    device_id: UUID (unique hardware/agent instance ID)
-    tenant_id: UUID (associated Organization/Tenant)
+    device_id: UUID (server-assigned ID)
+    organization_id: UUID (associated Organization/Tenant)
+    branch_id: UUID (associated Branch)
+    agent_instance_id: UUID (client-generated persistent ID)
     agent_version: string (e.g. "0.1.0")
     os_name: string
     os_version: string
@@ -231,7 +235,9 @@ Device {
 ```json
 {
   "device_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
-  "tenant_id": "c1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
+  "organization_id": "c1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
+  "branch_id": "b1b2b3b4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
+  "agent_instance_id": "e4d3c2b1-a0f9-8e7d-6c5b-4a3b2c1d0e9f",
   "agent_version": "0.1.0",
   "os_info": {
     "os_name": "Windows 11 Pro",
@@ -244,9 +250,9 @@ Device {
 
 ---
 
-## 5. Tenant & Multi-Organization Boundary
+## 5. Tenant, Multi-Branch & Software Declaration Architecture
 
-To ensure the Desktop Agent remains reusable across diverse deployment environments (Single Independent Pharmacy, Pharmacy Chain, Warehouse, Distributor/Supplier):
+To support real-world pharmacy chains, independent stores, and multi-branch suppliers where different branches may operate distinct ERP systems:
 
 ```text
                ┌──────────────────────────────┐
@@ -257,22 +263,65 @@ To ensure the Desktop Agent remains reusable across diverse deployment environme
                               │
                               │ *
                ┌──────────────┴───────────────┐
-               │            Device            │
-               │   (Desktop Agent Instance)   │
-               └──────────────┬───────────────┘
-                              │ 1
-                              │
-                              │ *
-               ┌──────────────┴───────────────┐
-               │         Data Source          │
-               │ (ERP / SQLite / Future DBs)  │
-               └──────────────────────────────┘
+               │            Branch            │
+               │ (e.g. Main Branch, Branch B) │
+               └───────┬──────────────┬───────┘
+                       │ 1            │ 1
+                       │              │
+                       │ *            │ *
+        ┌──────────────┴────────┐    ┌┴─────────────────────────────┐
+        │        Device         │    │         Data Source          │
+        │(Desktop Agent Instance│    │  (ERP / SQLite / Future DBs) │
+        └───────────────────────┘    │                              │
+                                     │ - declared_software_name     │
+                                     │ - detected_software_name     │
+                                     │ - detection_status           │
+                                     └──────────────────────────────┘
 ```
 
-1. **Agnostic Agent**: The Desktop Agent does not contain hardcoded pharmacy or supplier tenant logic. It detects, profiles, and standardizes data.
-2. **Dynamic Role Mapping**: The Backend uses the `DatabaseProfile` (`PHARMACY`, `NON_PHARMACY`) to route data into the proper tenant domain (e.g., Clinical Prescriptions vs. General Wholesale POS).
+### 5.1 Clear Conceptual Distinctions
 
----
+It is essential to maintain clear separation between these four distinct concepts:
+
+| Concept | Definition | Examples |
+| :--- | :--- | :--- |
+| **Software / ERP** | The commercial management application used at the branch | `eStock`, `SofTech`, `PharmaCare` |
+| **DataSource** | The specific database instance connected to that application | SQLite file, SQL Server instance |
+| **Database Profile** | The semantic classification of what the database contains | `PHARMACY`, `NON_PHARMACY`, `UNKNOWN` |
+| **Organization Role** | The commercial/legal nature of the organization | `RETAIL_PHARMACY`, `PHARMACEUTICAL_SUPPLIER` |
+
+### 5.2 Multi-Branch Rules
+1. **One Organization → Many Branches**: An organization can have multiple branches.
+2. **Branch Isolation**: Each branch has its own server-generated `branch_id`. Branch names are descriptive attributes, never identities.
+3. **Heterogeneous Software**: Branches in the same organization may use different software (e.g., Branch A uses `eStock`, Branch B uses `eStock`, Branch C uses `SofTech`).
+4. **Branch Ownership**: Every `Device` and `DataSource` belongs to exactly one `Organization` and one `Branch`.
+
+### 5.3 Software Declaration, Detection & Status
+- **`declared_software_name`**: The software name declared by the user during onboarding or branch configuration.
+- **`detected_software_name`**: The software name detected locally by the Desktop Agent discovery engine.
+- **`detection_status`**:
+  - `MATCH`: User declaration and Agent detection agree on the software.
+  - `DECLARED_ONLY`: User declared a software, but Agent could not detect or confirm it.
+  - `DETECTED_ONLY`: Agent detected a software that the user did not declare.
+  - `CONFLICT`: Declared software contradicts detected software.
+  - `UNKNOWN`: No reliable declaration or detection available.
+
+### 5.4 Registration Flow
+```text
+Create Organization
+        ↓
+Create / Select Branch
+        ↓
+User declares software (e.g. eStock)
+        ↓
+Desktop Agent enrollment (binds to Organization + Branch)
+        ↓
+Local discovery & candidate validation
+        ↓
+DataSource registration (reports detected software)
+        ↓
+Backend stores declared + detected & evaluates detection_status
+```
 
 ## 6. Ingestion Units & Mutation Semantics
 

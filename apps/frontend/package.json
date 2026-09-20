@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start -p 3001",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/lib/api-client.test.mjs"
+    "test": "tsx --test src/lib/api-client.test.ts"
   },
   "dependencies": {
     "@pharma-signal/config": "*",

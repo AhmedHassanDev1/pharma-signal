@@ -6,11 +6,15 @@ export interface EnrollDeviceRequestDto {
   hostname: string;
   os: string;
   appVersion: string;
+  branchId?: string;
 }
 
 export interface EnrollDeviceResponseDto {
   deviceId: string;
-  tenantId: string;
+  organizationId: string;
+  branchId: string;
   deviceToken: string;
   status: DeviceStatus;
+  /** Backward compatibility alias for organizationId */
+  tenantId?: string;
 }

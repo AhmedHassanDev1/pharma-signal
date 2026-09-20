@@ -1,0 +1,7 @@
+export enum DetectionStatus {
+  MATCH = 'MATCH',
+  DECLARED_ONLY = 'DECLARED_ONLY',
+  DETECTED_ONLY = 'DETECTED_ONLY',
+  CONFLICT = 'CONFLICT',
+  UNKNOWN = 'UNKNOWN'
+}
